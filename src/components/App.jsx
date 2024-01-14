@@ -26,12 +26,7 @@ export class App extends Component {
     const prevPage = prevState.galleryPage;
     const nextPage = this.state.galleryPage;
 
-    if (prevQuery !== nextQuery) {
-      this.setState({ galleryPage: 1, galleryItems: [], isButtonShow: false });
-      if (nextPage === 1) {
-        this.fetchGalleryItems(nextQuery, nextPage);
-      }
-    } else if (prevPage !== nextPage) {
+    if (prevQuery !== nextQuery || prevPage !== nextPage) {
       this.fetchGalleryItems(nextQuery, nextPage);
     }
   }
@@ -42,55 +37,73 @@ export class App extends Component {
     postApiService.query = nextQuery;
     postApiService.page = nextPage;
 
-    postApiService.fetchPost().then(data => {
-      postApiService.hits = data.totalHits;
+    try {
+      postApiService.fetchPost().then(data => {
+        postApiService.hits = data.totalHits;
 
-      const newData = data.hits.map(
-        ({ id, tags, webformatURL, largeImageURL }) => ({
-          id,
-          tags,
-          webformatURL,
-          largeImageURL,
-        })
-      );
-      const currentData = [...this.state.galleryItems, ...newData];
-
-      this.setState(prevState => ({
-        galleryItems: [...prevState.galleryItems, ...newData],
-      }));
-
-      if (!data.totalHits) {
-        this.setState({ loading: false, error: true });
-        return Notiflix.Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.'
+        const newData = data.hits.map(
+          ({ id, tags, webformatURL, largeImageURL }) => ({
+            id,
+            tags,
+            webformatURL,
+            largeImageURL,
+          })
         );
-      }
+        const currentData = [...this.state.galleryItems, ...newData];
 
-      if (currentData.length >= data.totalHits) {
+        this.setState(prevState => ({
+          galleryItems: [...prevState.galleryItems, ...newData],
+        }));
+
+        if (!data.totalHits) {
+          this.setState({ loading: false, error: true });
+          Notiflix.Notify.failure(
+            'Sorry, there are no images matching your search query. Please try again.'
+          );
+          return;
+        }
+
+        if (currentData.length >= data.totalHits) {
+          this.setState({
+            loading: false,
+            isButtonShow: false,
+            error: false,
+          });
+          return;
+        }
+
+        if (nextPage === 1) {
+          Notiflix.Notify.success(
+            `Hooray! We found ${postApiService.hits} images.`
+          );
+        }
+
         this.setState({
           loading: false,
-          isButtonShow: false,
+          isButtonShow: true,
           error: false,
         });
-        return;
-      }
-
-      if (nextPage === 1) {
-        Notiflix.Notify.success(
-          `Hooray! We found ${postApiService.hits} images.`
-        );
-      }
-
+      });
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      this.setState({ loading: false, error: true });
+      Notiflix.Notify.failure(
+        'An error occurred while fetching data. Please try again.'
+      );
+    } finally {
       this.setState({
         loading: false,
-        isButtonShow: true,
-        error: false,
       });
-    });
+    }
   };
 
   handleFormSubmit = searchQuery => {
-    this.setState({ searchQuery });
+    this.setState({
+      searchQuery,
+      galleryPage: 1,
+      galleryItems: [],
+      isButtonShow: false,
+    });
   };
 
   onLoadMore = () => {
